@@ -24,4 +24,10 @@
 
 > Shiro架构
 
-![](https://image.kaelvihn.top/article/2024-01-03-2.png)
+![应用程序角度的工作流程图](https://image.kaelvihn.top/article/2024-01-03-2.png)
+
+- `Subject`：**主体**，代表了当前用户(不一定是人，有可能是爬虫或者是机器人)
+- `SecurityManger`：**安全管理器**,所有的与安全相关的操作抖会与其交互，并且他管理所有的**Subject**，是Shiro的核心
+- `Realm`：**域**，Shiro从Realm获取安全数据(用户，角色，权限)，获取到的数据需要交给**SecurityManger**进行验证
+
+![内部程序角度的Shiro架构](https://image.kaelvihn.top/article/2024-01-03-3.png)
