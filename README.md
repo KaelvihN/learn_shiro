@@ -259,9 +259,9 @@ public class JdbcRealm extends AuthorizingRealm {
 }
 ```
 
-> Authenticator 及 AuthenticationStrategy
+### Authenticator 及 AuthenticationStrategy
 
-**Authenticator**的职责是验证用户帐号，是**Shiro API**中身份验证核心的入口点：
+- `Authenticator`的职责是验证用户帐号，是**Shiro API**中身份验证核心的入口点：
 
 ```java
 package org.apache.shiro.authc;
@@ -274,4 +274,98 @@ public interface Authenticator {
 如果验证成功，将返回**AuthenticationInfo**验证信息，该信息中包含了**身份**和**凭证**。如果验证失败将抛出**AuthenticationException**实现。
 
 ![Authenticator类图](https://image.kaelvihn.top/article/2024-01-08-1.png)
+
+- `AuthenticationStrategy`的职责是配置验证时的验证规则。当然，Shiro也提供了默认的实现：***(默认是使用AtLeastOneSuccessfulStrategy)***
+
+```java
+public interface AuthenticationStrategy {
+    // 在所有Realm认证前调用
+    AuthenticationInfo beforeAllAttempts(Collection<? extends Realm> var1, AuthenticationToken var2) throws AuthenticationException;
+	// 每一个Realm认证前调用
+    AuthenticationInfo beforeAttempt(Realm var1, AuthenticationToken var2, AuthenticationInfo var3) throws AuthenticationException;
+	// 每一个Realm认证后调用
+    AuthenticationInfo afterAttempt(Realm var1, AuthenticationToken var2, AuthenticationInfo var3, AuthenticationInfo var4, Throwable var5) throws AuthenticationException;
+	// Realm全部认证后调用
+    AuthenticationInfo afterAllAttempts(AuthenticationToken var1, AuthenticationInfo var2) throws AuthenticationException;
+}
+```
+
+- - `FirstSuccessfulStrategy`：只要有一个**Realm**验证成功即可，只返回第一个**Realm**身份认证信息。其他忽略
+  - `AtLeastOneSuccessfulStrategy`：只要有一个**Realm**验证成功即可，但是与**FirstSuccessfulStrategy**不同的是，**AtLeastOneSuccessfulStrategy**会返回所有认证成功的**Realm**
+  - `AllSuccessfulStrategy`：所有**Realm**验证成功才算成功，且返回所有**Realm**验证通过的信息
+
+![AuthenticationStrategy类图](https://image.kaelvihn.top/article/2024-01-08-2.png)
+
+> 简单使用
+
+**配置ini文件(shiro-authenticator-all-success.ini)：**
+
+```ini
+; 指定securityManager的authenticator实现
+authenticator = org.apache.shiro.authc.pam.ModularRealmAuthenticator
+securityManager.authenticator = $authenticator
+; 指定securityManager.authenticator的authenticationStrategy
+allSuccessfulStrategy = org.apache.shiro.authc.pam.AllSuccessfulStrategy
+securityManager.authenticator.authenticationStrategy = $allSuccessfulStrategy
+; 配置Realm
+myRealm1 = cn.tuids.MyRealm1
+myRealm2 = cn.tuids.MyRealm2
+myRealm3 = cn.tuids.MyRealm3
+securityManager.realms=$myRealm1,$myRealm3
+```
+
+**代码示例：**
+
+```java
+/**
+ * @author tuids
+ * @date 2024/1/4 0:30
+ */
+public class ShiroApp {
+    static Logger logger;
+
+    static {
+        BasicConfigurator.configure();
+        logger = Logger.getLogger(ShiroApp.class);
+
+    }
+
+    @Test
+    public void test() {
+        login("classpath:shiro-authenticator-all-success.ini");
+        // 获取验证成功的subject
+        Subject subject = SecurityUtils.getSubject();
+        //得到一个身份集合，其包含了Realm验证成功的身份信息
+        PrincipalCollection principals = subject.getPrincipals();
+        System.out.println("principals = " + principals);
+
+    }
+
+    private void login(String configFile) {
+        // 创建SecurityManger工厂，此处使用Ini文件充当数据源来初始化SecurityManger
+        IniSecurityManagerFactory securityManagerFactory = new IniSecurityManagerFactory(configFile);
+        //创建对象实例，并绑定给SecurityUtils
+        SecurityManager securityManager = securityManagerFactory.createInstance();
+        SecurityUtils.setSecurityManager(securityManager);
+        //得到Subject，创建username/password 验证 token
+        Subject subject = SecurityUtils.getSubject();
+        UsernamePasswordToken token = new UsernamePasswordToken("tuids", "123");
+        try {
+            //登录验证身份
+            subject.login(token);
+            logger.info("登录成功," + subject.isAuthenticated());
+        } catch (AuthenticationException e) {
+            //登录失败
+            logger.error("登录失败,失败原因:" + e);
+        }
+    }
+}
+```
+
+**输出结果：**
+
+```
+101 [main] ERROR cn.tuids.ShiroApp  - 登录失败,失败原因:org.apache.shiro.authc.IncorrectCredentialsException
+principals = null
+```
 
